@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="data:">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<title>instasplitter</title>
+</head><body>
+
+<div class="jumbotron">
+  <h1 class="display-4">instasplitter</h1>
+  <p class="lead">JPGファイルをInstagram用に分割します（サーバーには送信されません）</p>
+</div>
+
+<div class="mx-5">
+  <div id="divmain" class="border px-5 mx-auto pt-3 pb-3"></div>
+  <div id=divmain2></div>
+  分割数 <select id=selw class="m-3">
+    <option>1</option>
+    <option>2</option>
+    <option selected>3</option>
+  </select>
+  <span class="m-1">x</span>
+  <select id=selh class="m-3">
+    <option>1</option>
+    <option>2</option>
+    <option>3</option>
+    <option>4</option>
+    <option>5</option>
+    <option>6</option>
+    <option>7</option>
+    <option>8</option>
+    <option>9</option>
+  </select><br>
+  <label><input id=chkmobile type=checkbox checked class="m-3">スマホ画面用 (画像間の隙間 3px)</label><br>
+  <!--
+  <button id=btn class="m-3">生成</button>
+  -->
+</div>
+
+<footer class="text-muted">
+  <div class="container my-4 mx-0">
+  <p>Design: <a href="https://getbootstrap.com/">Bootstrap</a> by <a href="https://twitter.com/mdo">@mdo</a></p>
+  <p>App: CC BY <a href="https://fukuno.jig.jp/4163">福野泰介の一日一創</a> by <a href="https://twitter.com/taisukef">@taisukef</a> (<a href=https://github.com/code4fukui/instasplitter/>src on GitHub</a>)</p>
+  <p>Related: <a href=https://code4sabae.github.io/csvbeauty/>csvbeauty</a>, <a href=https://code4fukui.github.io/txtbeauty/>txtbeauty</a></p>
+  </div>
+</footer>
+</main>
+
+<script type="module">
+import { downloadZip } from "https://code4sabae.github.io/js/downloadZip.js";
+import { downloadFile } from "https://code4sabae.github.io/js/downloadFile.js";
+import { waitDropFiles } from "https://code4sabae.github.io/js/waitDropFiles.js";
+import { readAsArrayBufferAsync } from "https://code4sabae.github.io/js/readAsArrayBufferAsync.js";
+import { ImageUtil } from "https://code4fukui.github.io/ImageUtil/ImageUtil.js";
+import { EXIF } from "https://taisukef.github.io/exif-js/EXIF.js";
+import { Base64 } from "https://code4fukui.github.io/Base64/Base64.js";
+import { makeImagesForInsta } from "https://code4fukui.github.io/imgcrop/cropImageInsta.js";
+
+const getFirstImage = async (items) => {
+  const files = [];
+  for (const item of items) {
+    const name = item.file.name;
+    const ispng = name.endsWith(".png");
+    if (!(name.endsWith(".jpg") || name.endsWith(".jpeg") || ispng)) {
+      continue;
+    }
+    try {
+      const file = item.file;
+      const bin = await readAsArrayBufferAsync(file);
+      const exif = EXIF.readFromBinaryFile(bin);
+      const colorSpace = exif && exif.ColorSpace == "sRGB"; // || imgsrgb.checked ? "srgb" : "display-p3";
+      const img = await ImageUtil.getImageFromArrayBuffer(bin);
+      img.colorSpace = colorSpace;
+      return { img, bin, name };
+    } catch (e) {
+      console.log(e);
+      console.log("can't decode image: " + name);
+    }
+  }
+  return null;
+};
+
+onload = async () => {
+  for (;;) {
+    divmain.innerHTML = "JPGファイルをドロップしてください";
+    try {
+      const items = await waitDropFiles(divmain);
+      const { img, bin, name } = await getFirstImage(items);
+
+      const offx = 0;
+      const offy = 0;
+      const nw = selw.value;
+      const nh = selh.value;
+      const imgw = img.width / (nw * 1.01);
+      const pcmode = !chkmobile.checked;
+      const files = await makeImagesForInsta(name, bin, offx, offy, imgw, nw, nh, pcmode);
+
+      if (files.length == 1) {
+        downloadFile(files[0].name, files[0].data);
+      } else {
+        downloadZip("jpgs.zip", files);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
+};
+</script>
+
+<style>
+</style>
+
+
+</body></html>
